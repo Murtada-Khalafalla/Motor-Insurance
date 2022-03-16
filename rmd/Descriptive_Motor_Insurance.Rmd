@@ -1,0 +1,622 @@
+---
+title: "Descriptive_Motor_Insurance"
+author: "Murtada Khalafalla"
+date: "24/08/2020"
+output:
+  html_document: default
+  word_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(funModeling)
+library(skimr)
+library(Hmisc)
+library(MASS)
+library(stargazer)
+library(ggcharts)
+library(plotly)
+library(carData)
+library(glue)
+library(patchwork)
+library(gt)
+library(DT)
+#---------------------------------Source Code---------------------------------------------------------
+insur_data <- read_excel("C:/Users/murtada/Desktop/Motor Insurance/data/Descriptive_Data.xlsx")
+
+motor_insur_df <- insur_data %>%
+  
+  dplyr::select(Gender,Age,Occupation,Residence,Driving_Experience,
+                Manufacturing_Country,Type,Model,Vehicle_Age,Cylinder_Capacity,
+                Claim_Count,Claim_Amount) %>% 
+  
+  # Gender
+  mutate(Gender = factor(Gender, levels = c(1,2),
+                         labels = c("Male","Female"))) %>% 
+  # Age
+  mutate(Age=round(Age,0)) %>% 
+  mutate(Age = case_when(
+    between(Age, 17, 24) ~1,
+    between(Age, 25,30) ~2,
+    between(Age ,31, 60) ~3,
+    Age >60 ~ 4)) %>% 
+  mutate(Age = factor(Age, levels = c(1,2,3,4), 
+                      labels = c("18-24","25-30","31-60",">60"))) %>% 
+  
+  # Occupation
+  mutate(Occupation= factor(Occupation, 
+                            levels = c(1,2,3,4,5,6,7), 
+                            labels = c("Employee","Engineer and Programmer","Medical Profession","Business man/woman","Free Lancer","Student","Others"))) %>% 
+  
+  # Residence
+  mutate(Residence = factor(Residence, 
+                            levels = c(1,2,3),
+                            labels = c("Khartoum","Khartoum Bahari","Oumdrman") )) %>% 
+  
+  # Manufacutring country
+  mutate(Manufacturing_Country = factor(Manufacturing_Country, 
+                                  levels = c(1,2,3,4,5,6),
+                                  labels = c("Korea","Japan","Sudan","Germany","Czech","Others"))) %>% 
+  
+  # Type 
+  mutate(Type = factor(Type,
+                      levels = c(1,2,3,4,5,6,7,8),
+                      labels = c("Hyundai","Kia","Toyota","Mitsubishi","Giad","Mercedes","Skoda","Others"))) %>% 
+  
+  # Model
+  mutate(Model = factor(Model,
+                        levels = c(1,2,3,4,5,6,7,8,9,10,11) ,
+                        labels = c("Accent","Click","Tucson","Santa Fe","Visto","Corolla","Hilux","Prado / Land Cruiser","Lancer","BYD","Others"))) %>% 
+  
+  # Age_of_Vehicle
+  mutate(Vehicle_Age = case_when(
+    between(Vehicle_Age, 2011 , 2017) ~ 1,
+    between(Vehicle_Age, 2006 ,2010) ~ 2,
+    between(Vehicle_Age, 1996 ,2005) ~ 3,
+    TRUE ~ 4)) %>%  
+  mutate(Vehicle_Age = factor(Vehicle_Age, 
+                                 levels = c(1,2,3,4), 
+                                 labels = c("0-5","6-10","11-20",">20"))) %>%
+  
+  # Cylinder_capacity
+  mutate(Cylinder_Capacity = factor(Cylinder_Capacity, 
+                                    levels = c(1,2,3), 
+                                    labels = c("Small","Medium","Large"))) %>% 
+  
+  # Driving_Experience
+  mutate(Driving_Experience=round(Driving_Experience,0)) %>%
+  mutate(Driving_Experience = case_when(
+    between(Driving_Experience,0 ,5) ~ 1,
+    between(Driving_Experience,6, 10) ~ 2,
+    between(Driving_Experience,11 ,20 ) ~ 3,
+    TRUE ~ 4)) %>%  
+  mutate(Driving_Experience = factor(Driving_Experience, 
+                                     levels = c(1,2,3,4), 
+                                     labels = c("0-5","6-10","11-20",">20")))
+
+```
+
+# Summary and Descriptive Statistics
+```{r summary_data, echo=FALSE}
+descrip_data<-motor_insur_df %>% 
+  set_names("Gender","Age","Occupation","Residence","Driving Experience","Manufacturing Country","Type","Model","Vehicle Age","Cylinder Capacity","Claim Count","ClaimAmount")
+
+summary(descrip_data)
+#describe(motor_insur_df)
+```
+
+```{r}
+#Claim_Count
+## 25% 
+## Mean 1.4009 
+## Standard Deviation 0.7424 
+## Minimum 1.0000 
+## First Quantile 1.0000 
+## Median 1.0000 
+## Third Quantile 2.0000
+## 90% Quantile 2.0000 
+## 95% Quantile 3.0000 
+## 99% Quantile 4.0000 
+## Maximum 8.0000 
+
+#Claim_Amount
+## 25% 
+## Mean 10682.13 
+## Standard Deviation 24491.88 
+## Minimum 50.00 
+## First Quantile 1215.00 
+## Median 4690.25 
+## Third Quantile 10717.00 
+## 90% Quantile 22672.40 
+## 95% Quantile 36283.20 
+## 99% Quantile 105912.68 
+## Maximum 450000.00
+```
+
+```{r descriptive_data, echo=FALSE}
+#--Descriptive Models------------------------------------------------
+#Residence
+cont_Residence_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Residence) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freq_Residence=  case_when(
+    str_detect(Residence,"Khartoum") ~ round(Claim_Count/6504,3),
+    str_detect(Residence,"Khartoum Bahari") ~ round(Claim_Count/3779,3),
+    str_detect(Residence,"Oumdrman") ~ round(Claim_Count/4402,3)))
+
+ggage_Residence<- ggplot(cont_Residence_freq, aes(x=Residence, y=Freq_Residence, fill=Residence))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Freq_Residence , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Residence - Frequency")+
+  xlab("Residence") + ylab("Annual Claim Frequency")
+#ggage_Residence
+#----------------------------------------------------
+
+#--Gender Frequency
+cont_gender_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Gender) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Frequency=  case_when(
+    Gender=="Male" ~ paste0(round(((Claim_Count)/12311)*100,1),"%"),
+    Gender=="Female" ~ paste0(round(((Claim_Count)/2374)*100,1),"%")))
+ggGenderFreq<- ggplot(cont_gender_freq, aes(x=Gender, y=Frequency, fill=Gender))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  scale_fill_manual(values = c("darkorange","cyan4", guide=FALSE))+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  labs(title = "Gender - Frequency")+
+  xlab("Gender") + ylab("Annual Claim Frequency")
+#ggGenderFreq
+
+#--Gender Severity ----------------
+cont_Gender_sevrty<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Gender) %>% 
+  summarise(Claim_Amount=sum(Claim_Amount), Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Frequency_qender=  case_when(
+    Gender=="Male" ~ round((Claim_Amount/Claim_Count),3),
+    Gender=="Female" ~ round((Claim_Amount/Claim_Count),3)))
+
+ggGender_Severity<- ggplot(cont_Gender_sevrty, aes(x=Gender, y=Frequency_qender, fill=Gender))+ 
+  #the_model_themes+
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  scale_fill_manual(values = c("darkorange","cyan4", guide=FALSE))+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Frequency_qender, hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Gender - Severity")+
+  xlab("Gender") + ylab("Annual Claim Severity.(SDG)")
+#ggGender_Severity
+#ggGenderFreq+ ggGender_Severity
+#----------------------------------------------------------------
+
+# --Age_of_Vehicle Frequency
+cont_age_of_vchile_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Vehicle_Age) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freq=  case_when(
+    Vehicle_Age=="0-5" ~ round((Claim_Count/4438),3),
+    Vehicle_Age=="6-10" ~ round((Claim_Count/5356),3),
+    Vehicle_Age=="11-20" ~ round((Claim_Count/4345),3),
+    Vehicle_Age==">20" ~ round((Claim_Count/546),3)))
+
+ggage_of_vchileFreq<- ggplot(cont_age_of_vchile_freq, aes(x=Vehicle_Age, y=Freq, fill=Vehicle_Age))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Freq, hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Vehicle Age -Frequency" )+
+  xlab("Vehicle Age") + ylab("Annual Claim Frequency")
+#ggage_of_vchileFreq
+
+#-------------------------------------------------
+#Age_of_Vehicle 
+cont_Age_of_Vehicle_sevrty<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Vehicle_Age) %>% 
+  summarise(Claim_Amount=sum(Claim_Amount), Claim_Count=sum(Claim_Count)) %>% 
+  mutate(FreAge_of_Vehicle=  case_when(
+    str_detect(Vehicle_Age,"6-10") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Vehicle_Age,"0-5") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Vehicle_Age,"11-20") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Vehicle_Age,">20") ~(round(Claim_Amount/Claim_Count,0))))
+ggAge_of_Vehicle_Severity<- ggplot(cont_Age_of_Vehicle_sevrty, aes(x=Vehicle_Age, y=FreAge_of_Vehicle, fill=Vehicle_Age))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=FreAge_of_Vehicle, hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Vehicle Age - Severity")+
+  xlab("Vehicle Age") + ylab("Annual Claim Severity. (SDG)")
+#ggAge_of_Vehicle_Severity
+#ggage_of_vchileFreq+ ggAge_of_Vehicle_Severity
+#-----------------------------------------------------------
+# --Freq_Age
+Age_num_policyholder<- motor_insur_df %>% 
+  count(Age) %>% 
+  arrange(-n) %>%
+  mutate(Number.of.policyholders=n) %>% 
+  mutate(Freq_age_num=  case_when(
+    str_detect(Age,"18-24") ~ (Number.of.policyholders),
+    str_detect(Age,"25-30") ~ (Number.of.policyholders),
+    str_detect(Age,"31-60") ~ (Number.of.policyholders), 
+    str_detect(Age,">60") ~ (Number.of.policyholders)))
+ggage_num_policyholder<- ggplot(Age_num_policyholder, aes(x=Age, y=Freq_age_num, fill=Age))+ 
+  
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Freq_age_num , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Age - Number of policyholders")+
+  xlab("Age") + ylab("Number of policyholders")
+#ggage_num_policyholder.
+
+#---------------
+# Age Frequency
+cont_age_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Age) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freq_age=  case_when(
+    str_detect(Age,"18-24") ~ round(Claim_Count/883,3),
+    str_detect(Age,"25-30") ~ round(Claim_Count/1801,3),
+    str_detect(Age,"31-60") ~ round(Claim_Count/10417,3), 
+    str_detect(Age,">60") ~ round(Claim_Count/1584,3)))
+
+ggage_Freq<- ggplot(cont_age_freq, aes(x=Age, y=Freq_age, fill=Age))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Freq_age , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Age - Frequency")+
+  xlab("Age") + ylab("Annual Claim Frequency") + ylim(0,0.6)
+#ggage_Freq
+#ggage_num_policyholder+ggage_Freq
+
+#---------------
+#  Manufac_country Frequency
+cont_Manufac_country_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Manufacturing_Country) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freq_Manufac_country=  case_when(
+    str_detect(Manufacturing_Country,"Korea") ~ (round(((Claim_Count)/7576),3)),
+    str_detect(Manufacturing_Country,"Japan") ~ (round(((Claim_Count)/4871),3)),
+    str_detect(Manufacturing_Country,"Sudan") ~ (round(((Claim_Count)/1157),3)),
+    str_detect(Manufacturing_Country,"Germany") ~ (round(((Claim_Count)/584),3)),
+    str_detect(Manufacturing_Country,"Czech") ~ (round(((Claim_Count)/240),3)),
+    str_detect(Manufacturing_Country,"Others") ~ (round(((Claim_Count)/257),3))))
+ggManufacure_Freq<- ggplot(cont_Manufac_country_freq, aes(x=Manufacturing_Country, y=Freq_Manufac_country, fill=Manufacturing_Country))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Freq_Manufac_country , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Manufacturing Country - Frequency")+
+  xlab("Manufacturing Country") + ylab("Annual Claim Frequency")
+#ggManufacure_Freq
+#------------------------------------------------------
+#Manufacturing_Country_Sevirity
+cont_Manufacure_sevrty<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Manufacturing_Country) %>% 
+  summarise(Claim_Amount=sum(Claim_Amount), Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freq_Manufacturing=  case_when(
+    str_detect(Manufacturing_Country,"Korea") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Manufacturing_Country,"Japan") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Manufacturing_Country,"Sudan")~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Manufacturing_Country,"Germany") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Manufacturing_Country,"Czech")  ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Manufacturing_Country,"Others") ~(round(Claim_Amount/Claim_Count,0)),))
+ggManufacure_Severity<- ggplot(cont_Manufacure_sevrty, aes(x=Manufacturing_Country, y=Freq_Manufacturing, fill=Manufacturing_Country))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Freq_Manufacturing, hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Manufacturing Country - Severity")+
+  xlab("Manufacturing Country") + ylab("Annual Claim Severity. (SDG)") +  ylim(0,10600)
+ggManufacure_Severity
+#ggage_of_vchileFreq+ ggAge_of_Vehicle_Severity
+#
+#------
+Manufacure_policyholder<- motor_insur_df %>% 
+  count(Manufacturing_Country) %>% 
+  arrange(-n) %>%
+  mutate(Number.of.policyholders=n) %>% 
+  mutate(Freq_Manufacturing=  case_when(
+    str_detect(Manufacturing_Country,"Korea") ~ (Number.of.policyholders),
+    str_detect(Manufacturing_Country,"Japan") ~ (Number.of.policyholders),
+    str_detect(Manufacturing_Country,"Sudan") ~ (Number.of.policyholders), 
+    str_detect(Manufacturing_Country,"Germany") ~ (Number.of.policyholders), 
+    str_detect(Manufacturing_Country,"Czech")  ~ (Number.of.policyholders), 
+    str_detect(Manufacturing_Country,"Others") ~ (Number.of.policyholders)))
+ggManufacure_policyholder<- ggplot(Manufacure_policyholder, aes(x=Manufacturing_Country, y=Freq_Manufacturing, fill=Manufacturing_Country))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 1))+
+  geom_text(aes(label=Freq_Manufacturing , hjust=0.5, vjust=0.5), color="black")+
+  labs(title = "Manufacturing Country - Number of policyholders")+
+  xlab("Manufacturing Country") + ylab("Number of Policyholders")+ ylim(0,8000)
+#ggManufacure_policyholder
+#ggManufacure_policyholder+ggManufacure_Freq
+#----------------------------
+# --Model Severity
+cont_Model_sevrty<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Model) %>% 
+  summarise(Claim_Amount=sum(Claim_Amount), Claim_Count=sum(Claim_Count)) %>% 
+  mutate(FreModel=  case_when(
+    Model=="Accent" ~ round(Claim_Amount/Claim_Count,0),
+    Model== "Click" ~ round(Claim_Amount/Claim_Count,0),
+    Model == "Tucson" ~ round(Claim_Amount/Claim_Count,0),
+    Model == "Accent" ~ round(Claim_Amount/Claim_Count,0),
+    Model == "Santa Fe" ~ round(Claim_Amount/Claim_Count,0),
+    Model == "Visto" ~ round(Claim_Amount/Claim_Count,0),
+    Model == "Corolla"  ~ round(Claim_Amount/Claim_Count,0),
+    Model== "Hilux" ~ round(Claim_Amount/Claim_Count,0),
+    Model== "Prado / Land Cruiser" ~ round(Claim_Amount/Claim_Count,0),
+    Model== "Lancer" ~ round(Claim_Amount/Claim_Count,0),
+    Model== "BYD" ~ round(Claim_Amount/Claim_Count,0),
+    Model== "Others" ~ round(Claim_Amount/Claim_Count,0))) 
+ggModel_Severity<- ggplot(cont_Model_sevrty, aes(x=Model, y=FreModel, fill=Model))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 1.5))+
+  theme(axis.text.x=element_text(angle = 90, hjust = 1 , vjust = 0.5))+
+  scale_x_discrete(labels=c("Accent","Click","Tucson","Santa.Fe","Visto","Corolla","Hilux","Prado\nLand Cruiser","Lancer","BYD","Others"))+
+  geom_text(aes(label=FreModel , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Model - Severity")+
+  xlab("Model") + ylab("Annual Claim Severity. (SDG)")+ ylim(0,12000)
+  
+#ggModel_Severity
+#--------------------------------------------
+#---Model Frequency
+cont_Model_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Model) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Frequency=  case_when(
+    str_detect(Model,"Accent") ~ (round(((Claim_Count)/2262),3)),
+    str_detect(Model,"Click") ~ (round(((Claim_Count)/948),3)),
+    str_detect(Model,"Tucson") ~ (round(((Claim_Count)/842),3)),
+    str_detect(Model,"Santa Fe") ~ (round(((Claim_Count)/329),3)),
+    str_detect(Model,"Visto") ~ (round(((Claim_Count)/445),3)),
+    str_detect(Model,"Corolla") ~ (round(((Claim_Count)/1354),3)),
+    str_detect(Model,"Hilux") ~ (round(((Claim_Count)/1072),3)),
+    str_detect(Model,"Prado / Land Cruiser") ~ (round(((Claim_Count)/625),3)),
+    str_detect(Model,"Lancer") ~ (round(((Claim_Count)/303),3)),
+    str_detect(Model,"BYD") ~ (round(((Claim_Count)/235),3)),
+    str_detect(Model,"Others") ~ (round(((Claim_Count)/6270),3))))
+ggModelFreq<- ggplot(cont_Model_freq, aes(x=Model, y=Frequency, fill=Model))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = 0.9 , position = position_dodge(width = 2))+      theme(axis.text.x=element_text(angle = 90, hjust = 1 , vjust = 0.5))+
+  scale_x_discrete(labels=c("Accent","Click","Tucson","Santa.Fe","Visto","Corolla","Hilux","Prado\nLand Cruiser","Lancer","BYD","Others"))+
+  geom_text(aes(label=Frequency , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Model - Frequency")+
+  xlab("Model") + ylab("Annual Claim Frequency")+ ylim(0,0.6)
+#ggModelFreq
+#ggModelFreq+ggModel_Severity
+#-------------------------------------------------
+#--Occupation Sevrety
+cont_occupation_Sevrety<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Occupation) %>% 
+  summarise(Claim_Amount=sum(Claim_Amount), Claim_Count=sum(Claim_Count)) %>% 
+  mutate(FreOccupation=  case_when(
+    str_detect(Occupation,"Employee") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Occupation,"Engineer and Programmer") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Occupation,"Medical Profession") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Occupation,"Business man/woman") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Occupation,"Free Lancer") ~(round(Claim_Amount/Claim_Count)),
+    str_detect(Occupation,"Student") ~(round(Claim_Amount/Claim_Count,0)),
+    str_detect(Occupation,"Others") ~(round(Claim_Amount/Claim_Count,0)),))
+ggoccupation_Sevrty<- ggplot(cont_occupation_Sevrety, aes(x=Occupation, y=FreOccupation, fill=Occupation))+
+theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+  theme(axis.text.x=element_text(angle = 90, hjust = 1 , vjust = 0.5))+
+  scale_x_discrete(labels=c("Employee","Engineer\nProgrammer","Medical\nProfession","Business\n man\nwoman","Free.Lancer","Student","Others"))+
+  geom_text(aes(label=FreOccupation , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Occupation - Severity")+
+  xlab("Occupation") + ylab("Annual Claim Severity. (SDG)")
+#ggoccupation_Sevrty
+#--------------------------------------------
+# Occupation frequncy
+cont_occupation_freq<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Occupation) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(FreOccupation=  case_when(
+    str_detect(Occupation,"Employee") ~ round((Claim_Count/6424),3),
+    str_detect(Occupation,"Engineer and Programmer") ~ round((Claim_Count/1957),3),
+    str_detect(Occupation,"Medical Profession") ~ round((Claim_Count/986),3),
+    str_detect(Occupation,"Business man/woman") ~ round((Claim_Count/652),3),
+    str_detect(Occupation,"Free Lancer") ~ round((Claim_Count/1635),3),
+    str_detect(Occupation,"Student") ~ round((Claim_Count/613),3),
+    str_detect(Occupation,"Others") ~ round((Claim_Count/2418),3)))
+
+ggoccupation_Freq<- ggplot(cont_occupation_freq, aes(x=Occupation, y=FreOccupation, fill=Occupation))+
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+   theme(axis.text.x=element_text(angle = 90, hjust = 1 , vjust = 0.5))+
+  scale_x_discrete(labels=c("Employee","Engineer\nProgrammer","Medical\nProfession","Business\n man\nwoman","Free.Lancer","Student","Others"))+
+  geom_text(aes(label=FreOccupation , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Occupation - Frequency")+
+  xlab("Occupation") + ylab("Annual Claim Frequency")
+#ggoccupation_Freq
+#ggoccupation_Freq+ggoccupation_Sevrty
+#-----------------------------------------------------------
+# Make Frequency
+cont_Type_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Type) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Type_Frequency=  case_when(
+    str_detect(Type,"Hyundai") ~ (round(((Claim_Count)/6143),3)),
+    str_detect(Type,"Kia") ~ (round(((Claim_Count)/1100),3)),
+    str_detect(Type,"Toyota") ~ (round(((Claim_Count)/3671),3)),
+    str_detect(Type,"Mitsubishi") ~ (round(((Claim_Count)/529),3)),
+    str_detect(Type,"Giad") ~ (round(((Claim_Count)/1157),3)),
+    str_detect(Type,"Mercedes") ~ (round(((Claim_Count)/254),3)),
+    str_detect(Type,"Skoda") ~ (round(((Claim_Count)/240),3)),
+    str_detect(Type,"Others") ~ (round(((Claim_Count)/1591),3))))
+ggTypeFreq<- ggplot(cont_Type_freq, aes(x=Type, y=Type_Frequency, fill=Type))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = 0.9 , position = position_dodge(width = 2))+      
+  theme(axis.text.x=element_text(angle = 90, hjust = 1 , vjust = 0.5))+
+  scale_x_discrete(labels=c("Hyundai","Kia","Toyota","Mitsubishi","Giad","Mercedes","Skoda","Others"))+
+  geom_text(aes(label=Type_Frequency , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Type - Frequency")+
+  xlab("Type") + ylab("Annual Claim Frequency")+ ylim(0,0.6)
+#ggTypeFreq
+#-----------------
+#--Type Sevrety
+cont_Type_Sevrety<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Type) %>% 
+  summarise(Claim_Amount=sum(Claim_Amount), Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freq_Type=  case_when(
+      str_detect(Type,"Hyundai") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Type,"Kia") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Type,"Toyota") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Type,"Mitsubishi") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Type,"Giad") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Type,"Mercedes") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Type,"Skoda") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Type,"Others") ~ (round(((Claim_Amount)/Claim_Count),0))))
+ggType_Sevrty<- ggplot(cont_Type_Sevrety, aes(x=Type, y=Freq_Type, fill=Type))+
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+  theme(axis.text.x=element_text(angle = 90, hjust = 1 , vjust = 0.5))+
+  scale_x_discrete(labels=c("Hyundai","Kia","Toyota","Mitsubishi","Giad","Mercedes","Skoda","Others"))+
+  geom_text(aes(label=Freq_Type , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Type - Severity")+
+  xlab("Type") + ylab("Annual Claim Severity. (SDG)")
+#ggType_Sevrty
+
+#------------------------
+#Cylinder_Capacity_Frequency
+cont_Cylinder_Capacity_freq<- motor_insur_df %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Cylinder_Capacity) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freq_Cylinder_Capacity=  case_when(
+    str_detect(Cylinder_Capacity,"Small") ~ (round(((Claim_Count)/1808),3)),
+    str_detect(Cylinder_Capacity,"Medium") ~ (round(((Claim_Count)/9268),3)),
+    str_detect(Cylinder_Capacity,"Large") ~ (round(((Claim_Count)/3609),3))))
+ggCylinder_CapacityFreq<- ggplot(cont_Cylinder_Capacity_freq, aes(x=Cylinder_Capacity, y=Freq_Cylinder_Capacity, fill=Cylinder_Capacity))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+
+  geom_text(aes(label=Freq_Cylinder_Capacity, hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Cylinder Capacity - Frequency")+
+  xlab("Cylinder Capacity") + ylab("Annual Claim Frequency")+ ylim(0,0.6)
+#ggCylinder_CapacityFreq
+
+#Cylinder_Capacity_Sevirity.
+Cylinder_Capacity_Sevrety<- motor_insur_df %>% 
+  filter(Claim_Amount>0) %>% 
+  group_by(Cylinder_Capacity) %>% 
+  summarise(Claim_Amount=sum(Claim_Amount), Claim_Count=sum(Claim_Count)) %>% 
+  mutate(Freqs_Cylinder_Capacity=  case_when(
+      str_detect(Cylinder_Capacity,"Small") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Cylinder_Capacity,"Medium") ~ (round(((Claim_Amount)/Claim_Count),0)),
+      str_detect(Cylinder_Capacity,"Large") ~ (round(((Claim_Amount)/Claim_Count),0))))
+ggCylinder_Capacity_Sevrety<- ggplot(Cylinder_Capacity_Sevrety, aes(x=Cylinder_Capacity, y=Freqs_Cylinder_Capacity, fill=Cylinder_Capacity))+
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 0.9))+  
+  geom_text(aes(label=Freqs_Cylinder_Capacity, hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Cylinder Capacity - Severity")+
+  xlab("Cylinder Capacity") + ylab("Annual Claim Severity. (SDG)")
+#ggCylinder_Capacity_Sevrety
+
+#---------------------
+#Cylinder_Capacity_Policyholders
+Cylinder_Capacity_policyholder<- motor_insur_df %>% 
+  count(Cylinder_Capacity) %>% 
+  arrange(-n) %>%
+  mutate(Number.of.policyholders=n) %>% 
+  mutate(Freq_Capacity=  case_when(
+    str_detect(Cylinder_Capacity,"Large") ~ (Number.of.policyholders),
+    str_detect(Cylinder_Capacity,"Medium") ~ (Number.of.policyholders),
+    str_detect(Cylinder_Capacity,"Small") ~ (Number.of.policyholders)))
+
+ggCylinder_Capacity_policyholder<- ggplot(Cylinder_Capacity_policyholder, aes(x=Cylinder_Capacity, y=Freq_Capacity, fill=Cylinder_Capacity))+ 
+  theme_minimal()+
+  theme(legend.position = "nonw" )+
+  geom_bar (stat="identity",size=2, width = .9 , position = position_dodge(width = 1))+
+  geom_text(aes(label=Freq_Capacity , hjust=0.5, vjust=1.5), color="white")+
+  labs(title = "Cylinder Capacity - Number of policyholders")+
+  xlab("Cylinder Capacity") + ylab("Number of Policyholders")+ ylim(0,10000)
+
+#ggCylinder_Capacity_policyholder
+```
+
+```{r echo=FALSE}
+ggGenderFreq   #gender
+
+ggGender_Severity
+```
+
+```{r echo=FALSE}
+ggage_of_vchileFreq   # Age_of_Vehicle
+  
+ggAge_of_Vehicle_Severity
+```
+
+```{r echo=FALSE}
+ggage_Freq          # Age
+
+ggage_num_policyholder
+```
+
+```{r echo=FALSE}
+ggManufacure_Freq   #Manufacure
+
+ggManufacure_Severity 
+
+ggManufacure_policyholder
+```
+
+```{r echo=FALSE}
+ggoccupation_Freq  # occupation
+
+ggoccupation_Sevrty
+```
+
+```{r echo=FALSE}
+ggModelFreq     #Model
+
+ggModel_Severity
+```
+
+```{r echo=FALSE}
+ggTypeFreq   # Type
+
+ggType_Sevrty
+```
+
+```{r echo=FALSE}
+ggCylinder_CapacityFreq    #Cylinder_Capacity
+
+ggCylinder_Capacity_Sevrety
+
+ggCylinder_Capacity_policyholder   
+
+```
+
+```{r echo=FALSE}
+ggage_Residence   #Residence
+```
+
+
+
+

@@ -1,0 +1,216 @@
+---
+title: "Advance_Descriptive"
+author: "Murtada Khalafalla"
+date: "8/18/2020"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(readxl)
+library(funModeling)
+library(skimr)
+library(Hmisc)
+library(MASS)
+library(stargazer)
+library(ggcharts)
+library(plotly)
+library(carData)
+library(glue)
+library(patchwork)
+library(gt)
+library(DT)
+#---------------------------------Source Code---------------------------------------------------------
+insur_data <- read_excel("C:/Users/murtada/Desktop/Motor Insurance/data/Descriptive_Data.xlsx")
+
+motor_insur_df <- insur_data %>%
+  
+  dplyr::select(Gender,Age,Occupation,Residence,Driving_Experience,Manufacturing_Country,Type,Model,Vehicle_Age,Cylinder_Capacity,Claim_Count,Claim_Amount) %>% 
+  
+  # Gender
+  mutate(Gender = factor(Gender, levels = c(1,2),
+                         labels = c("Male","Female"))) %>% 
+  # Age
+  mutate(Age=round(Age,0)) %>% 
+  mutate(Age = case_when(
+    between(Age, 17, 24) ~1,
+    between(Age, 25,30) ~2,
+    between(Age ,31, 60) ~3,
+    Age >60 ~ 4)) %>% 
+  mutate(Age = factor(Age, levels = c(1,2,3,4), 
+                      labels = c("18-24","25-30","31-60",">60"))) %>% 
+  
+  # Occupation
+  mutate(Occupation= factor(Occupation, 
+                            levels = c(1,2,3,4,5,6,7), 
+                            labels = c("Employee","Engineer and Programmer","Medical Profession","Business man/woman","Free Lancer","Student","Others"))) %>% 
+  
+  # Residence
+  mutate(Residence = factor(Residence, 
+                            levels = c(1,2,3),
+                            labels = c("Khartoum","Khartoum Bahari","Oumdrman") )) %>% 
+  
+  # Manufacutring country
+  mutate(Manufacturing_Country = factor(Manufacturing_Country, 
+                                  levels = c(1,2,3,4,5,6),
+                                  labels = c("Korea","Japan","Sudan","Germany","Czech","Others"))) %>% 
+  
+  # Type 
+  mutate(Type = factor(Type,
+                      levels = c(1,2,3,4,5,6,7,8),
+                      labels = c("Hyundai","Kia","Toyota","Mitsubishi","Giad","Mercedes","Skoda","Others"))) %>% 
+  
+  # Model
+  mutate(Model = factor(Model,
+                        levels = c(1,2,3,4,5,6,7,8,9,10,11) ,
+                        labels = c("Accent","Click","Tucson","Santa Fe","Visto","Corolla","Hilux","Prado / Land Cruiser","Lancer","BYD","Others"))) %>% 
+  
+  # Age_of_Vehicle
+  mutate(Vehicle_Age = case_when(
+    between(Vehicle_Age, 2011 , 2017) ~ 1,
+    between(Vehicle_Age, 2006 ,2010) ~ 2,
+    between(Vehicle_Age, 1996 ,2005) ~ 3,
+    TRUE ~ 4)) %>%  
+  mutate(Vehicle_Age = factor(Vehicle_Age, 
+                                 levels = c(1,2,3,4), 
+                                 labels = c("0-5","6-10","11-20",">20"))) %>%
+  
+  # Cylinder_capacity
+  mutate(Cylinder_Capacity = factor(Cylinder_Capacity, 
+                                    levels = c(1,2,3), 
+                                    labels = c("Small","Medium","Large"))) %>% 
+  
+  # Driving_Experience
+  mutate(Driving_Experience=round(Driving_Experience,0)) %>%
+  mutate(Driving_Experience = case_when(
+    between(Driving_Experience,0 ,5) ~ 1,
+    between(Driving_Experience,6, 10) ~ 2,
+    between(Driving_Experience,11 ,20 ) ~ 3,
+    TRUE ~ 4)) %>%  
+  mutate(Driving_Experience = factor(Driving_Experience, 
+                                     levels = c(1,2,3,4), 
+                                     labels = c("0-5","6-10","11-20",">20")))
+```
+
+```{r echo=FALSE}
+#filter by Gender and Residence
+filter_Gender_Age<- motor_insur_df %>% 
+  select(Claim_Count,Gender,Age) %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Gender,Age) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  pivot_wider(names_from = Gender, values_from = Claim_Count) %>% 
+  ungroup() 
+
+datatable(data=filter_Gender_Age, rownames = FALSE,
+          caption ="Relation Between Gender - Age" , 
+          colnames = c("Age", "Male","Female")) 
+
+plot_ly(filter_Gender_Age,
+        x=~Age ,
+        y=~Male,
+        type = "bar",
+        name="Male") %>% 
+  add_trace(y=~Female,
+            name="Female") %>% 
+  layout(title="Relation Between Gender - Age",
+         xaxis=list(title="Age", zeroline=FALSE),
+         yaxis=list(title="Annual Claim Frequency", zeroline=FALSE),
+         barmode="group")
+
+#-------------------------filter by Gender and Residence
+filter_Gender_Residence<- motor_insur_df %>% 
+  select(Claim_Count,Gender,Residence) %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Gender,Residence) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  pivot_wider(names_from = Gender, values_from = Claim_Count) %>% 
+  ungroup()
+
+datatable(data=filter_Gender_Residence, rownames = FALSE,
+          caption ="Relation Between Residence & Gender" , 
+          colnames = c("Residence", "Male","Female")) 
+plot_ly(filter_Gender_Residence,
+        x=~Residence ,
+        y=~Male,
+        type = "bar",
+        name="Male") %>% 
+  add_trace(y=~Female,
+            name="Female") %>% 
+  layout(title="Relation Between Gender - Residence",
+         xaxis=list(title="Residence", zeroline=FALSE),
+         yaxis=list(title="Annual Claim Frequency", zeroline=FALSE),
+         barmode="group")
+
+#--------------------Gender and Occupation
+filter_Gender_Occupation <- motor_insur_df %>% 
+  select(Claim_Count,Gender,Occupation) %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Gender,Occupation) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  pivot_wider(names_from = Gender, values_from = Claim_Count) %>% 
+  ungroup()
+
+datatable(data=filter_Gender_Occupation, rownames = FALSE,
+          caption ="Relation Between Gender - Occupation" , 
+          colnames = c("Occupation", "Male","Female")) 
+
+plot_ly(filter_Gender_Occupation,
+        x=~Occupation ,
+        y=~Male,
+        type = "bar",
+        name="Male") %>% 
+  add_trace(y=~Female,
+            name="Female") %>% 
+  layout(title="Relation Between Gender - Occupation",
+         xaxis=list(title="Occupation", zeroline=FALSE),
+         yaxis=list(title="Annual Claim Frequency", zeroline=FALSE),
+         barmode="group")
+
+#-------------Type_Vehicle_Age
+filter_Type_Vehicle_Age <- motor_insur_df %>% 
+  select(Claim_Count,Type,Vehicle_Age) %>% 
+  filter(Claim_Count>0) %>% 
+  group_by(Type,Vehicle_Age) %>% 
+  summarise(Claim_Count=sum(Claim_Count)) %>% 
+  pivot_wider(names_from = Type, values_from = Claim_Count) %>% 
+  
+mutate(Vehicle_Age = case_when(
+  str_detect(Vehicle_Age,'0-5') ~ "2011-2017",
+  str_detect(Vehicle_Age,'6-10') ~ "2006-2010",
+  str_detect(Vehicle_Age,'11-20') ~ "1996-2005",
+  str_detect(Vehicle_Age,'>20') ~ "<1996"))
+
+datatable(data=filter_Type_Vehicle_Age, rownames = FALSE,
+          caption ="Relation Between Type - Age of Vehicle" , 
+          colnames = c("Age of Vehicle","Hyundai", "Kia", "Toyota", "Mitsubishi","Giad","Mercedes","Skoda","Others")) 
+
+plot_ly(filter_Type_Vehicle_Age,
+        x=~Vehicle_Age ,
+        y=~Hyundai,
+        type = "bar",
+        name="Hyundai") %>% 
+  add_trace(y=~Kia,
+            name="Kia") %>% 
+  add_trace(y=~Toyota,
+            name="Toyota") %>% 
+  add_trace(y=~Mitsubishi,
+            name="Mitsubishi") %>% 
+  add_trace(y=~Giad,
+            name="Giad") %>% 
+  add_trace(y=~Mercedes,
+            name="Mercedes") %>% 
+  add_trace(y=~Skoda,
+            name="Skoda") %>% 
+  add_trace(y=~Others,
+            name="Others") %>% 
+  layout(title="Relation Between Type - Age of Vehicle",
+         xaxis=list(title="Age of Vehicle", zeroline=FALSE),
+         yaxis=list(title="Annual Claim Frequency", zeroline=FALSE),
+         barmode="group")
+```
+
